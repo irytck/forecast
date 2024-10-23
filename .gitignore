@@ -1,0 +1,43 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+env/
+*.env
+*.venv
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# Log files
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Python package files
+*.egg
+*.egg-info/
+dist/
+build/
+*.eggs
+
+# Environment variable files
+.env
+*.env
+
+# MacOS specific files
+*.DS_Store
+
+# Files related to editors
+.vscode/
+.idea/
+
+# Dependency directories
+pip-wheel-metadata/
+*.lock
