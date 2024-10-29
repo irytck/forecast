@@ -22,6 +22,7 @@ from pmdarima import auto_arima
 
 # statsmodels
 import statsmodels
+from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.stattools import kpss
@@ -199,3 +200,77 @@ axs[3, 1].set_title('Residuals', fontsize=12)
 fig.suptitle('Time serie decomposition original series versus differenced series', fontsize=14)
 fig.tight_layout()
 plt.show()
+
+
+# Split Train and Test
+split_index = int(len(ts) * 0.8)
+
+data_train = ts.iloc[:split_index]
+data_test = ts.iloc[split_index:]
+
+print(
+    f"Train dates : {ts.index.min()} --- {data_train.index.max()}  "
+    f"(n={len(data_train)})"
+)
+print(
+    f"Test dates  : {data_test.index.min()} --- {ts.index.max()}  "
+    f"(n={len(data_test)})"
+)
+# Plot train test
+fig, ax = plt.subplots(figsize=(7, 3))
+ax.plot(data_train.index, data_train.values, label='Train', color='blue')
+ax.plot(data_test.index, data_test.values, label='Test', color='orange')
+ax.set_title('Monthly fuel consumption in Spain')
+ax.legend()
+plt.show()
+
+# First-order differentiation combined with seasonal differentiation
+data_diff_1_12 = data_train.diff().diff(12).dropna()
+
+warnings.filterwarnings("ignore")
+adfuller_result = adfuller(data_diff_1_12)
+print(f'ADF Statistic: {adfuller_result[0]}, p-value: {adfuller_result[1]}')
+kpss_result = kpss(data_diff_1_12)
+print(f'KPSS Statistic: {kpss_result[0]}, p-value: {kpss_result[1]}')
+warnings.filterwarnings("default")
+
+'''
+La serie original es no estacionaria, pero tras una diferenciación de primer orden se vuelve estacionaria. 
+Por lo tanto, una diferenciación de primer orden es suficiente para lograr estacionariedad en esta serie, 
+lo que es ideal para el modelado de series temporales, como los modelos ARIMA.
+'''
+
+# Fit ARIMA model
+arima_model = ARIMA(data_train, order=(1, 1, 1))
+arima_fit = arima_model.fit()
+print(arima_fit.summary())
+
+# Prediction with ARIMA
+arima_forecast = arima_fit.get_forecast(steps=len(data_test))
+arima_forecast_mean = arima_forecast.predicted_mean
+arima_forecast_mean.name = 'predictions_ARIMA'
+
+# Fit SARIMA model
+sarima_model = SARIMAX(data_train, order=(1, 1, 1), seasonal_order=(1, 1, 1, 12))
+sarima_fit = sarima_model.fit(disp=False)
+print(sarima_fit.summary())
+
+# Prediction with SARIMA
+sarima_forecast = sarima_fit.get_forecast(steps=len(data_test))
+sarima_forecast_mean = sarima_forecast.predicted_mean
+sarima_forecast_mean.name = 'predictions_SARIMA'
+
+# Plotting the original series and forecasts
+plt.figure(figsize=(15, 8))
+plt.plot(data_train, label='Original Time Series', color='blue')
+plt.plot(arima_forecast_mean, label='ARIMA Forecast', color='orange')
+plt.plot(sarima_forecast_mean, label='SARIMA Forecast', color='green')
+plt.plot(data_test, label='Actual Test Data', color='red', linestyle='--')  # Adding actual test data
+plt.title('Time Series Forecasting')
+plt.xlabel('Date')
+plt.ylabel('Sales')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
