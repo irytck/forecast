@@ -11,7 +11,8 @@ Allow for more accurate budgeting and pricing strategies for fuel-dependent indu
 
 **Methodology:**
 
-Use seasonal decomposition of time series (SARIMA or Fourier terms) to separate out seasonal trends and identify recurring patterns.
+Univariate time series: Use seasonal decomposition of time series (SARIMA) to separate out seasonal trends and identify recurring patterns.
+Multivariate time series using Recurent Networks
 Apply GARCH models to quantify and forecast volatility caused by external shocks.
 Conduct event analysis to measure the immediate and long-term impacts of specific shocks (e.g., COVID-19, OPEC decisions) on monthly fuel prices.
 
