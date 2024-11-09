@@ -7,6 +7,7 @@ Created on Wed Oct 23 12:40:39 2024
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import math
 plt.style.use('seaborn-v0_8-darkgrid')
 
 # pmdarima
@@ -26,6 +27,14 @@ from skforecast.ForecasterSarimax import ForecasterSarimax
 from skforecast.model_selection_sarimax import backtesting_sarimax
 from skforecast.model_selection_sarimax import grid_search_sarimax
 
+# LSTM
+from keras.models import Sequential
+from keras.layers import LSTM
+from keras.layers import Dense
+
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_squared_error
+
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -35,7 +44,7 @@ set_dark_theme()
 # =============================================================================
 # Load Data
 # =============================================================================
-data = pd.read_excel("../data/energy_prices_raw.xlsx")
+data = pd.read_excel("/Users/User/projects/forecast/data/energy_prices_raw.xlsx")
 
 # Filter for Spain and USD, then pivot by PRODUCT
 pivoted_data = (
@@ -80,10 +89,10 @@ plt.legend()
 plt.show()
 
 # Drop unnecessary columns for analysis
-ts = df.drop(columns = ['Gasoline (unit/Litre)', 'Light fuel oil (unit/Litre)', 'Light fuel oil (unit/1000 litres)'])
+data = df.drop(columns = ['Gasoline (unit/Litre)', 'Light fuel oil (unit/Litre)', 'Light fuel oil (unit/1000 litres)'])
 
 # Original Time series Decomposition
-res_decompose = seasonal_decompose(ts, model='additive', extrapolate_trend='freq')
+res_decompose = seasonal_decompose(data, model='additive', extrapolate_trend='freq')
 
 fig, axs = plt.subplots(nrows=4, ncols=1, figsize=(9, 6), sharex=True)
 
@@ -100,20 +109,20 @@ fig.tight_layout()
 plt.show()
 
 # Log transformation to stabilize variance
-ts['log_diesel']=np.log(ts['Automotive diesel (unit/Litre)'])
+data['log_diesel']=np.log(data['Automotive diesel (unit/Litre)'])
 
 # =============================================================================
 # Step2: Stationarity Test
 # =============================================================================
-
-adfuller_result_ts = adfuller(ts['log_diesel'])
-kpss_result_ts = kpss(ts['log_diesel'])
+ts = data['log_diesel']
+adfuller_result_ts = adfuller(ts)
+kpss_result_ts = kpss(ts)
 
 # First Differencing to achieve stationarity
-ts_diff_1 = ts['log_diesel'].diff().dropna()
+ts_diff_1 = ts.diff().dropna()
 
 adfuller_result_ts1 = adfuller(ts_diff_1)
-kpss_result_ts1 = kpss(ts['log_diesel'].diff().dropna())
+kpss_result_ts1 = kpss(ts.diff().dropna())
 
 print('Test stationarity for original series')
 print('-------------------------------------')
@@ -146,7 +155,7 @@ plt.show()
 
 ## ACF for original and differentiated series
 fig, axs = plt.subplots(nrows=2, ncols=1, figsize=(6, 4), sharex=True)
-plot_acf(ts['Automotive diesel (unit/Litre)'], ax=axs[0], lags=50, alpha=0.05)
+plot_acf(data['Automotive diesel (unit/Litre)'], ax=axs[0], lags=50, alpha=0.05)
 axs[0].set_title('Autocorrelation original series')
 plot_acf(ts_diff_1, ax=axs[1], lags=50, alpha=0.05)
 axs[1].set_title('Autocorrelation differentiated series (order=1)')
@@ -154,7 +163,7 @@ plt.show()
 
 ## PACF for original and differenced series
 fig, axs = plt.subplots(nrows = 2, ncols = 1, figsize = (6,4), sharex = True)
-plot_pacf(ts['Automotive diesel (unit/Litre)'], ax=axs[0], lags = 50,  alpha=0.05)
+plot_pacf(data['Automotive diesel (unit/Litre)'], ax=axs[0], lags = 50,  alpha=0.05)
 axs[0].set_title('Partial autocorrelation original series')
 plot_pacf(ts_diff_1, ax=axs[1], lags = 50, alpha =0.05)
 axs[1].set_title('Partial autocorrelation diferenced serie (order = 1')
@@ -165,10 +174,10 @@ plt.show()
 # =============================================================================
 
 # Split Data into Train and Test
-split_index = int(len(ts['log_diesel']) * 0.9)
+split_index = int(len(ts) * 0.9)
 
-data_train = ts['log_diesel'].iloc[:split_index]
-data_test = ts['log_diesel'].iloc[split_index:]
+data_train = ts.iloc[:split_index]
+data_test = ts.iloc[split_index:]
 
 print('\nTrain and Test Data range')
 print('--------------------------------------------------')
@@ -260,9 +269,9 @@ print(
 # Plot train, validation and test
 # =============================================================================
 fig, ax = plt.subplots(figsize=(7, 3))
-ts['log_diesel'].loc[:end_train].plot(ax=ax, label='train')
-ts['log_diesel'].loc[end_train:end_val].plot(ax=ax, label='validation')
-ts['log_diesel'].loc[end_val:].plot(ax=ax, label='test')
+ts.loc[:end_train].plot(ax=ax, label='train')
+ts.loc[end_train:end_val].plot(ax=ax, label='validation')
+ts.loc[end_val:].plot(ax=ax, label='test')
 ax.set_title('Monthly fuel price in Spain')
 ax.legend()
 plt.show()
@@ -284,7 +293,7 @@ param_grid = {
 
 results_grid = grid_search_sarimax(
                    forecaster            = forecaster,
-                   y                     = ts['log_diesel'].loc[:end_val],
+                   y                     = ts.loc[:end_val],
                    param_grid            = param_grid,
                    steps                 = 12,
                    refit                 = True,
@@ -302,7 +311,7 @@ print(results_grid[['order','seasonal_order', 'mean_absolute_error']].head(5))
 # Auto arima: selection based on AIC
 # =============================================================================
 model = auto_arima(
-            y                 = ts['log_diesel'].loc[:end_val],
+            y                 = ts.loc[:end_val],
             start_p           = 0,
             start_q           = 0,
             max_p             = 3,
@@ -326,8 +335,8 @@ forecaster = ForecasterSarimax(
 
 metric_m1, predictions_m1 = backtesting_sarimax(
                                 forecaster            = forecaster,
-                                y                     = ts['log_diesel'],
-                                initial_train_size    = len(ts['log_diesel'].loc[:end_val]),
+                                y                     = ts,
+                                initial_train_size    = len(ts.loc[:end_val]),
                                 steps                 = 12,
                                 metric                = 'mean_absolute_error',
                                 refit                 = True,
@@ -345,8 +354,8 @@ forecaster = ForecasterSarimax(
 
 metric_m2, predictions_m2 = backtesting_sarimax(
                                 forecaster            = forecaster,
-                                y                     = ts['log_diesel'],
-                                initial_train_size    = len(ts['log_diesel'].loc[:end_val]),
+                                y                     = ts,
+                                initial_train_size    = len(ts.loc[:end_val]),
                                 steps                 = 12,
                                 metric                = 'mean_absolute_error',
                                 refit                 = True,
@@ -363,8 +372,8 @@ forecaster = ForecasterSarimax(
     )
 metric_m0, predictions_m0 = backtesting_sarimax(
     forecaster = forecaster, 
-    y = ts['log_diesel'], 
-    initial_train_size = len(ts['log_diesel'].loc[:end_val]),
+    y = ts, 
+    initial_train_size = len(ts.loc[:end_val]),
     steps = 12, 
     metric = 'mean_absolute_error', 
     refit = True,
@@ -390,7 +399,7 @@ fig, ax = plt.subplots(figsize=(6, 3))
 
 # Plot Actual data with Predictions
 # =============================================================================
-ts['log_diesel'].loc[end_val:].plot(ax=ax, label='test', color='grey')
+ts.loc[end_val:].plot(ax=ax, label='test', color='grey')
 
 predictions_m0 = predictions_m0.rename(columns={'pred': 'original model'})
 predictions_m1 = predictions_m1.rename(columns={'pred': 'grid search'})
@@ -404,3 +413,102 @@ predictions_m2['autoarima'].plot(ax=ax, label='autoarima', color='blue', linesty
 ax.set_title('Backtest predictions with ARIMA model')
 ax.legend()
 plt.show()
+
+# =============================================================================
+# RECURENT NEURAL NETWORK LSTM
+# =============================================================================
+# Convert to numpy array
+ts = data['Automotive diesel (unit/Litre)']
+ts = ts.values.reshape(-1, 1)
+
+# LSTM uses sigmoid and tanh that are sensitive to magnitude sol values must be normalized
+scaler = MinMaxScaler(feature_range=(0,1))
+ts = scaler.fit_transform(ts)
+
+# Split in train and test
+train_size = int(len(ts)*0.7)
+test_size = len(ts) - train_size
+train, test = ts[0:train_size, :], ts[train_size:len(ts),:]
+
+# Define function to convert an array of values into a dataset matrix
+
+def to_sequences(data, seq_size=1):
+    '''Creates a dataset where X is the value at a given time step (t, t-1, t-2, ...)
+    and y is a value at the next time step (t+1)
+    data: Serie temporal
+    seq_size: Number of previous time steps to use as input variables to predict the next time period'''
+    x = []
+    y = []
+
+    for i in range(len(data)-seq_size-1):
+        #print(i)
+        window = data[i:(i+seq_size), 0]
+        x.append(window)
+        y.append(data[i+seq_size, 0])
+        
+    return np.array(x),np.array(y)
+
+seq_size = 7
+
+trainX, trainY = to_sequences(train, seq_size=seq_size)
+testX, testY = to_sequences(test, seq_size=seq_size)
+
+print("Shape of training set: {}".format(trainX.shape))
+print("Shape of test set: {}".format(testX.shape))
+
+# Reshape input to be [samples, time steps, features]
+trainX = np.reshape(trainX, (trainX.shape[0], 1, trainX.shape[1]))
+testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
+
+print('Single LSTM with hidden Dense:')
+model = Sequential()
+model.add(LSTM(64, input_shape=(None, seq_size)))
+model.add(Dense(32))
+model.add(Dense(1))
+model.compile(loss='mean_squared_error', optimizer='adam')
+#monitor = EarlyStopping(monitor='val_loss', min_delta=1e-3, patience=20, 
+#                        verbose=1, mode='auto', restore_best_weights=True)
+model.summary()
+print('Train:')
+
+model.fit(trainX, trainY, validation_data=(testX, testY),
+          verbose=2, epochs=100)
+
+
+# make predictions
+
+trainPredict = model.predict(trainX)
+testPredict = model.predict(testX)
+
+# invert predictions back to prescaled values
+trainPredict = scaler.inverse_transform(trainPredict)
+trainY = scaler.inverse_transform([trainY])
+testPredict = scaler.inverse_transform(testPredict)
+testY = scaler.inverse_transform([testY])
+
+# calculate RMSE
+trainScore = math.sqrt(mean_squared_error(trainY[0], trainPredict[:,0]))
+print('Train Score: %.2f RMSE' % (trainScore))
+
+testScore = math.sqrt(mean_squared_error(testY[0], testPredict[:,0]))
+print('Test Score: %.2f RMSE' % (testScore))
+
+# shift train predictions for plotting
+trainPredictPlot = np.empty_like(ts)
+trainPredictPlot[:, :] = np.nan
+trainPredictPlot[seq_size:len(trainPredict)+seq_size, :] = trainPredict
+
+# shift test predictions for plotting
+testPredictPlot = np.empty_like(ts)
+testPredictPlot[:, :] = np.nan
+testPredictPlot[len(trainPredict)+(seq_size*2)+1:len(ts)-1, :] = testPredict
+
+# plot baseline and predictions
+plt.plot(scaler.inverse_transform(ts), label='Baseline (Actual)')
+plt.plot(trainPredictPlot, label='Train Predictions')
+plt.plot(testPredictPlot, label='Test Predictions')
+plt.legend()
+plt.show()
+
+
+
