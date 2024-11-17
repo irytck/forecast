@@ -14,8 +14,46 @@ This project explores the diesel fuel price trends in Spain over the period from
 
 ### Univariate Time Series Analysis
 
-- **SARIMA Modeling**: A Seasonal Autoregressive Integrated Moving Average (SARIMA) model was applied to the diesel price data to decompose the time series into trend, seasonality, and noise components. This approach helps reveal recurring patterns that may influence price behavior in the long term.
-- **Seasonal Decomposition**: By decomposing the series, we separate out seasonal fluctuations and analyze underlying trends.
+This part includes exploratory data analysis (EDA), stationarity testing, time series decomposition, SARIMA modeling, and hyperparameter optimization, complemented by a Recurrent Neural Network (LSTM) approach for forecasting. 
+
+**Data Preparation**
+- Load and preprocess data from an Excel file.
+- Filter the dataset for Spain and prices in USD.
+- Handle missing values and convert the **light fuel oil** prices to a per-litre basis.
+- Resample the data to a monthly frequency.
+
+**Exploratory Data Analysis (EDA)**
+- Visualize trends in **gasoline**, **diesel**, and **light fuel oil** prices.
+- Decompose the time series to observe seasonal, trend, and residual components.
+
+**Stationarity Testing**
+- Conduct stationarity tests using the **ADF** and **KPSS** tests.
+- Apply differencing to make the series stationary, as required for SARIMA modeling.
+- Decompose the differenced series to analyze its components.
+
+**Autocorrelation Analysis**
+- Plot ACF and PACF for the original and differenced series to identify potential SARIMA parameters.
+
+**SARIMA Modeling**
+- Fit a SARIMA(1,1,1)(1,1,0,12) model to the data.
+- Perform diagnostic checks on residuals to ensure the model's validity.
+
+**Hyperparameter Optimization**
+- Conduct a grid search and evaluate SARIMA models using backtesting with a **mean absolute error (MAE)** metric.
+- Compare the best SARIMA model from the grid search with an **auto_arima** model.
+
+**Model Evaluation**
+- Split data into train and test sets.
+- Compare predictions from the original SARIMA model, grid search optimization, and auto_arima.
+
+**Recurrent Neural Network (LSTM)**
+- Normalize data for LSTM training.
+- Split the time series into sequences and train/test sets.
+- Train an LSTM model for forecasting and compare its performance against the SARIMA models.
+
+**Visualization**
+- Plot observed and predicted values to compare performance across different models.
+- Include confidence intervals for SARIMA predictions.
 
 ### Multivariate Time Series Analysis
 
